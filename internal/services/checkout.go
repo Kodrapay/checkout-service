@@ -6,21 +6,18 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kodra-pay/checkout-service/internal/dto"
-	"github.com/kodra-pay/checkout-service/internal/repositories"
 )
 
-type CheckoutService struct {
-	repo *repositories.CheckoutRepository
-}
+type CheckoutService struct{}
 
-func NewCheckoutService(repo *repositories.CheckoutRepository) *CheckoutService {
-	return &CheckoutService{repo: repo}
+func NewCheckoutService() *CheckoutService {
+	return &CheckoutService{}
 }
 
 func (s *CheckoutService) CreateSession(_ context.Context, req dto.CheckoutSessionRequest) dto.CheckoutSessionResponse {
 	return dto.CheckoutSessionResponse{
 		ID:       "chk_" + uuid.NewString(),
-		Status:   "created",
+		Status:   "pending",
 		Amount:   req.Amount,
 		Currency: req.Currency,
 	}
@@ -28,16 +25,13 @@ func (s *CheckoutService) CreateSession(_ context.Context, req dto.CheckoutSessi
 
 func (s *CheckoutService) GetSession(_ context.Context, id string) dto.CheckoutSessionResponse {
 	return dto.CheckoutSessionResponse{
-		ID:       id,
-		Status:   "created",
-		Amount:   0,
-		Currency: "NGN",
+		ID:     id,
+		Status: "pending",
 	}
 }
 
 func (s *CheckoutService) Pay(_ context.Context, req dto.CheckoutPayRequest) dto.CheckoutPayResponse {
 	return dto.CheckoutPayResponse{
-		TransactionReference: "txn_" + uuid.NewString(),
-		Status:               "processing",
+		Status: "paid",
 	}
 }
