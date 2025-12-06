@@ -6,10 +6,13 @@ import (
 )
 
 type Config struct {
-	ServiceName string
-	Port        string
-	PostgresDSN string
-	RedisAddr   string
+	ServiceName            string
+	Port                   string
+	PostgresDSN            string
+	RedisAddr              string
+	TransactionServiceURL  string
+	WalletLedgerServiceURL string
+	FeeServiceURL          string
 }
 
 func Load(serviceName, defaultPort string) Config {
@@ -23,10 +26,13 @@ func Load(serviceName, defaultPort string) Config {
 	}
 
 	return Config{
-		ServiceName: serviceName,
-		Port:        getEnv("PORT", defaultPort),
-		PostgresDSN: dsn,
-		RedisAddr:   getEnv("REDIS_ADDR", "redis:6379"),
+		ServiceName:            serviceName,
+		Port:                   getEnv("PORT", defaultPort),
+		PostgresDSN:            dsn,
+		RedisAddr:              getEnv("REDIS_ADDR", "redis:6379"),
+		TransactionServiceURL:  getEnv("TRANSACTION_SERVICE_URL", "http://transaction-service:7004/api/v1"),     // Align with docker-compose port
+		WalletLedgerServiceURL: getEnv("WALLET_LEDGER_SERVICE_URL", "http://wallet-ledger-service:7007/api/v1"), // Align with docker-compose port
+		FeeServiceURL:          getEnv("FEE_SERVICE_URL", "http://fee-service:7017"),                            // Fee service base
 	}
 }
 

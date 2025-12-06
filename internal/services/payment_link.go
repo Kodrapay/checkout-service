@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/kodra-pay/checkout-service/internal/dto"
 	"github.com/kodra-pay/checkout-service/internal/models"
 	"github.com/kodra-pay/checkout-service/internal/repositories"
@@ -20,11 +18,6 @@ func NewPaymentLinkService(repo *repositories.PaymentLinkRepository) *PaymentLin
 }
 
 func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCreateRequest) dto.PaymentLinkResponse {
-	ref := req.Reference
-	if ref == "" {
-		ref = "pl_" + uuid.NewString()
-	}
-
 	pl := &models.PaymentLink{
 		MerchantID:  req.MerchantID,
 		Mode:        req.Mode,
@@ -32,7 +25,6 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 		Currency:    req.Currency,
 		Description: req.Description,
 		Status:      "active",
-		Reference:   ref,
 	}
 	_ = s.repo.Create(ctx, pl)
 
@@ -43,7 +35,6 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 		Amount:      pl.Amount,
 		Currency:    pl.Currency,
 		Description: pl.Description,
-		Reference:   pl.Reference,
 		Status:      pl.Status,
 		CreatedAt:   pl.CreatedAt.Format(time.RFC3339),
 	}
@@ -60,7 +51,6 @@ func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID stri
 			Amount:      pl.Amount,
 			Currency:    pl.Currency,
 			Description: pl.Description,
-			Reference:   pl.Reference,
 			Status:      pl.Status,
 			CreatedAt:   pl.CreatedAt.Format(time.RFC3339),
 		})

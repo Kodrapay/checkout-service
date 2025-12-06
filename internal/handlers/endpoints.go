@@ -33,7 +33,11 @@ func (h *CheckoutHandler) Pay(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	return c.JSON(h.svc.Pay(c.Context(), req))
+	resp, err := h.svc.Pay(c.Context(), req)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	return c.JSON(resp)
 }
 
 type PaymentLinkHandler struct {

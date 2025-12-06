@@ -31,18 +31,35 @@ func NewPaymentLinkRepository(dsn string) (*PaymentLinkRepository, error) {
 
 func (r *PaymentLinkRepository) Create(ctx context.Context, pl *models.PaymentLink) error {
 	query := `
-		INSERT INTO payment_links (id, merchant_id, mode, amount, currency, description, status, reference, created_at, updated_at)
-		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		INSERT INTO payment_links (merchant_id, mode, amount, currency, description, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
 	return r.db.QueryRowContext(ctx, query,
-		pl.MerchantID, pl.Mode, pl.Amount, pl.Currency, pl.Description, pl.Status, pl.Reference,
+		pl.MerchantID, pl.Mode, pl.Amount, pl.Currency, pl.Description, pl.Status,
 	).Scan(&pl.ID, &pl.CreatedAt, &pl.UpdatedAt)
+}
+
+func (r *PaymentLinkRepository) GetByID(ctx context.Context, id string) (*models.PaymentLink, error) {
+	query := `
+		SELECT id, merchant_id, mode, amount, currency, description, status, expires_at, created_at, updated_at
+		FROM payment_links
+		WHERE id = $1
+	`
+	var pl models.PaymentLink
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&pl.ID, &pl.MerchantID, &pl.Mode, &pl.Amount, &pl.Currency,
+		&pl.Description, &pl.Status, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &pl, nil
 }
 
 func (r *PaymentLinkRepository) ListByMerchant(ctx context.Context, merchantID string, limit int) ([]*models.PaymentLink, error) {
 	query := `
-		SELECT id, merchant_id, mode, amount, currency, description, status, reference, created_at, updated_at
+		SELECT id, merchant_id, mode, amount, currency, description, status, expires_at, created_at, updated_at
 		FROM payment_links
 		WHERE merchant_id = $1
 		ORDER BY created_at DESC
@@ -59,7 +76,7 @@ func (r *PaymentLinkRepository) ListByMerchant(ctx context.Context, merchantID s
 		var pl models.PaymentLink
 		if err := rows.Scan(
 			&pl.ID, &pl.MerchantID, &pl.Mode, &pl.Amount, &pl.Currency,
-			&pl.Description, &pl.Status, &pl.Reference, &pl.CreatedAt, &pl.UpdatedAt,
+			&pl.Description, &pl.Status, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
