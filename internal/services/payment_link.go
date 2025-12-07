@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/kodra-pay/checkout-service/internal/dto"
@@ -17,7 +18,7 @@ func NewPaymentLinkService(repo *repositories.PaymentLinkRepository) *PaymentLin
 	return &PaymentLinkService{repo: repo}
 }
 
-func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCreateRequest) dto.PaymentLinkResponse {
+func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCreateRequest) (dto.PaymentLinkResponse, error) {
 	pl := &models.PaymentLink{
 		MerchantID:  req.MerchantID,
 		Mode:        req.Mode,
@@ -26,7 +27,9 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 		Description: req.Description,
 		Status:      "active",
 	}
-	_ = s.repo.Create(ctx, pl)
+	if err := s.repo.Create(ctx, pl); err != nil {
+		return dto.PaymentLinkResponse{}, fmt.Errorf("failed to create payment link in repository: %w", err)
+	}
 
 	return dto.PaymentLinkResponse{
 		ID:          pl.ID,
@@ -37,7 +40,7 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 		Description: pl.Description,
 		Status:      pl.Status,
 		CreatedAt:   pl.CreatedAt.Format(time.RFC3339),
-	}
+	}, nil
 }
 
 func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID int) dto.PaymentLinkListResponse { // merchantID changed to int
@@ -56,4 +59,22 @@ func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID int)
 		})
 	}
 	return resp
+}
+
+func (s *PaymentLinkService) Get(ctx context.Context, id int) (*dto.PaymentLinkResponse, error) {
+	pl, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	resp := &dto.PaymentLinkResponse{
+		ID:          pl.ID,
+		MerchantID:  pl.MerchantID,
+		Mode:        pl.Mode,
+		Amount:      pl.Amount,
+		Currency:    pl.Currency,
+		Description: pl.Description,
+		Status:      pl.Status,
+		CreatedAt:   pl.CreatedAt.Format(time.RFC3339),
+	}
+	return resp, nil
 }

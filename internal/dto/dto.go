@@ -31,16 +31,17 @@ type CheckoutPayRequest struct {
 	CustomerName  string `json:"customer_name,omitempty"`
 	Description   string `json:"description,omitempty"`
 	Reference     string `json:"reference,omitempty"`
+	Origin        string `json:"origin,omitempty"` // Added for client IP
 }
 
 type CheckoutPayResponse struct {
-	TransactionReference int    `json:"transaction_reference,omitempty"`
+	TransactionReference string    `json:"transaction_reference,omitempty"`
 	Status               string `json:"status"`
 }
 
 // TransactionCreateRequest DTO for creating a new transaction in transaction-service
 type TransactionCreateRequest struct {
-	Reference     int    `json:"reference,omitempty"`
+	Reference     string    `json:"reference,omitempty"`
 	MerchantID    int    `json:"merchant_id"`
 	CustomerEmail string `json:"customer_email,omitempty"`
 	CustomerName  string `json:"customer_name,omitempty"`
@@ -55,7 +56,7 @@ type TransactionCreateRequest struct {
 // TransactionResponse DTO for transaction-service response
 type TransactionResponse struct {
 	ID            int       `json:"id"`
-	Reference     int       `json:"reference"`
+	Reference     string    `json:"reference"`
 	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email"`
 	CustomerName  string    `json:"customer_name,omitempty"`
@@ -75,7 +76,7 @@ type CreateWalletRequest struct {
 // UpdateBalanceRequest DTO for updating a wallet's balance in wallet-ledger-service
 type UpdateBalanceRequest struct {
 	Amount      int64  `json:"amount"`
-	Reference   int    `json:"reference"`
+	Reference   string `json:"reference"` // Changed from int to string
 	Description string `json:"description"`
 	Type        string `json:"type"` // "credit" or "debit"
 }

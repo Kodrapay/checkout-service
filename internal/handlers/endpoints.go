@@ -36,6 +36,7 @@ func (h *CheckoutHandler) Pay(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
+	req.Origin = c.IP() // Set the client IP from Fiber context
 	resp, err := h.svc.Pay(c.Context(), req)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
@@ -56,7 +57,11 @@ func (h *PaymentLinkHandler) Create(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	return c.JSON(h.svc.Create(c.Context(), req))
+	resp, err := h.svc.Create(c.Context(), req)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(resp)
 }
 
 func (h *PaymentLinkHandler) List(c *fiber.Ctx) error {
@@ -66,4 +71,16 @@ func (h *PaymentLinkHandler) List(c *fiber.Ctx) error {
 	//    return fiber.NewError(fiber.StatusBadRequest, "merchant_id query parameter is required")
 	// }
 	return c.JSON(h.svc.ListByMerchant(c.Context(), merchantID))
+}
+
+func (h *PaymentLinkHandler) Get(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid payment link id")
+	}
+	pl, err := h.svc.Get(c.Context(), id)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "Payment link not found")
+	}
+	return c.JSON(pl)
 }

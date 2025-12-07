@@ -15,6 +15,7 @@ type CheckoutService struct {
 	transactionClient  clients.TransactionClient
 	walletLedgerClient clients.WalletLedgerClient
 	feeClient          clients.FeeClient
+	fraudClient        clients.FraudClient // Add FraudClient
 	paymentLinkRepo    PaymentLinkRepository
 }
 
@@ -22,11 +23,12 @@ type PaymentLinkRepository interface {
 	GetByID(ctx context.Context, id int) (*models.PaymentLink, error)
 }
 
-func NewCheckoutService(txClient clients.TransactionClient, wlClient clients.WalletLedgerClient, feeClient clients.FeeClient, plRepo PaymentLinkRepository) *CheckoutService {
+func NewCheckoutService(txClient clients.TransactionClient, wlClient clients.WalletLedgerClient, feeClient clients.FeeClient, fraudClient clients.FraudClient, plRepo PaymentLinkRepository) *CheckoutService {
 	return &CheckoutService{
 		transactionClient:  txClient,
 		walletLedgerClient: wlClient,
 		feeClient:          feeClient,
+		fraudClient:        fraudClient, // Inject FraudClient
 		paymentLinkRepo:    plRepo,
 	}
 }
@@ -61,6 +63,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	amount := req.Amount
 	currency := req.Currency
 	description := req.Description
+	customerIDStr := strconv.Itoa(req.CustomerID) // Convert CustomerID to string for fraud service
 
 	// If payment link ID is provided, fetch payment link details
 	if req.PaymentLinkID != 0 {
@@ -94,6 +97,29 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		description = "Payment Link Transaction"
 	}
 
+	// === FRAUD CHECK ===
+	fraudReq := dto.FraudCheckRequest{
+		TransactionReference: req.Reference,
+		Amount:               float64(amount) / 100, // Convert back to float for fraud service, assuming cents
+		Currency:             currency,
+		CustomerID:           customerIDStr,
+		MerchantID:           strconv.Itoa(merchantID),
+		Origin:               req.Origin, // Use req.Origin which is passed from handler
+		PaymentMethod:        req.PaymentMethod,
+		// CustomData:           nil, // Add any custom data if needed
+	}
+
+	fraudDecision, err := s.fraudClient.CheckTransaction(ctx, fraudReq)
+	if err != nil {
+		return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("fraud check failed: %w", err)
+	}
+
+	if fraudDecision.Decision == "deny" {
+		// Use req.Reference (string) here
+		return dto.CheckoutPayResponse{Status: "denied_by_fraud", TransactionReference: req.Reference}, fmt.Errorf("transaction denied by fraud rules: %v", fraudDecision.Reasons)
+	}
+	// === END FRAUD CHECK ===
+
 	// 1. Quote fees (best-effort; fall back to zero on error)
 	var feeAmount int64
 	if s.feeClient != nil {
@@ -110,15 +136,6 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	}
 
 	// 2. Create Transaction in Transaction Service (gross amount)
-	var referenceInt int
-	if req.Reference != "" {
-		if parsed, err := strconv.Atoi(req.Reference); err == nil {
-			referenceInt = parsed
-		} else {
-			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("invalid reference: must be numeric")
-		}
-	}
-
 	transactionReq := dto.TransactionCreateRequest{
 		MerchantID:    merchantID,
 		CustomerEmail: req.CustomerEmail,
@@ -128,8 +145,13 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		Currency:      currency,
 		PaymentMethod: req.PaymentMethod,
 		Description:   description,
-		Status:        "successful", // Assuming immediate success for now
-		Reference:     referenceInt,
+		Status:        "successful",  // Assuming immediate success for now
+		Reference:     req.Reference, // Use string reference
+	}
+
+	// If fraud decision was "flag", update transaction status accordingly
+	if fraudDecision.Decision == "flag" {
+		transactionReq.Status = "pending_review" // or "flagged"
 	}
 
 	txResp, err := s.transactionClient.CreateTransaction(ctx, transactionReq)
@@ -168,8 +190,8 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 
 	updateBalanceReq := dto.UpdateBalanceRequest{
 		Amount:      netCredit,
-		Reference:   txResp.Reference, // Link to the transaction (int)
-		Description: fmt.Sprintf("Credit for transaction %d (fee: %d)", txResp.Reference, feeAmount),
+		Reference:   txResp.Reference, // Link to the transaction (string)
+		Description: fmt.Sprintf("Credit for transaction %s (fee: %d)", txResp.Reference, feeAmount),
 		Type:        "credit",
 	}
 

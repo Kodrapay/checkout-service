@@ -26,11 +26,15 @@ func Register(app *fiber.App, serviceName string, txClient clients.TransactionCl
 	plSvc := services.NewPaymentLinkService(repo)
 	plHandler := handlers.NewPaymentLinkHandler(plSvc)
 
-	checkoutSvc := services.NewCheckoutService(txClient, wlClient, feeClient, repo) // Pass the clients and payment link repo here
+	// Initialize FraudClient
+	fraudClient := clients.NewHTTPFraudClient(cfg.FraudServiceURL, cfg.FraudServiceAPIKey)
+
+	checkoutSvc := services.NewCheckoutService(txClient, wlClient, feeClient, fraudClient, repo) // Pass the clients, fraud client and payment link repo here
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutSvc)
 
 	app.Post("/payment-links", plHandler.Create)
 	app.Get("/payment-links", plHandler.List)
+	app.Get("/payment-links/:id", plHandler.Get)
 
 	app.Post("/checkout/session", checkoutHandler.CreateSession)
 	app.Get("/checkout/session/:id", checkoutHandler.GetSession)
