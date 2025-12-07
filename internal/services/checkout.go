@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/google/uuid" // Import uuid
+
 	"github.com/kodra-pay/checkout-service/internal/clients"
 	"github.com/kodra-pay/checkout-service/internal/dto"
 	"github.com/kodra-pay/checkout-service/internal/models"
@@ -72,12 +74,21 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("failed to get payment link: %w", err)
 		}
 
-		// Use payment link values if not provided in request
+		// Use payment link values where appropriate
 		merchantID = paymentLink.MerchantID
 		currency = paymentLink.Currency
-		if paymentLink.Amount != nil {
-			amount = *paymentLink.Amount
+
+		// For open links, honor the client-provided amount when present; fall back to link amount only if none was supplied.
+		if paymentLink.Mode == "fixed" {
+			if paymentLink.Amount != nil {
+				amount = *paymentLink.Amount
+			}
+		} else {
+			if amount == 0 && paymentLink.Amount != nil {
+				amount = *paymentLink.Amount
+			}
 		}
+
 		if paymentLink.Description != "" {
 			description = paymentLink.Description
 		}
@@ -97,9 +108,20 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		description = "Payment Link Transaction"
 	}
 
+	// Generate a robust transaction reference if not provided or just "2"
+	transactionReference := req.Reference
+	if transactionReference == "" || transactionReference == strconv.Itoa(req.PaymentLinkID) { // If it's empty or just the payment link ID
+		if req.PaymentLinkID != 0 {
+			transactionReference = fmt.Sprintf("PL_%d_%s", req.PaymentLinkID, uuid.New().String()[:8])
+		} else {
+			transactionReference = fmt.Sprintf("TXN_%s", uuid.New().String())
+		}
+	}
+
+
 	// === FRAUD CHECK ===
 	fraudReq := dto.FraudCheckRequest{
-		TransactionReference: req.Reference,
+		TransactionReference: transactionReference, // Use the generated/prefixed reference
 		Amount:               float64(amount) / 100, // Convert back to float for fraud service, assuming cents
 		Currency:             currency,
 		CustomerID:           customerIDStr,
@@ -116,7 +138,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 
 	if fraudDecision.Decision == "deny" {
 		// Use req.Reference (string) here
-		return dto.CheckoutPayResponse{Status: "denied_by_fraud", TransactionReference: req.Reference}, fmt.Errorf("transaction denied by fraud rules: %v", fraudDecision.Reasons)
+		return dto.CheckoutPayResponse{Status: "denied_by_fraud", TransactionReference: transactionReference}, fmt.Errorf("transaction denied by fraud rules: %v", fraudDecision.Reasons)
 	}
 	// === END FRAUD CHECK ===
 
@@ -146,7 +168,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		PaymentMethod: req.PaymentMethod,
 		Description:   description,
 		Status:        "successful",  // Assuming immediate success for now
-		Reference:     req.Reference, // Use string reference
+		Reference:     transactionReference, // Use the generated/prefixed reference
 	}
 
 	// If fraud decision was "flag", update transaction status accordingly
@@ -161,44 +183,49 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 
 	// 3. Update Wallet Balance in Wallet-Ledger Service (optional for payment links)
 	// This is primarily for customer wallet management, not required for payment processing
-	// First, try to get the customer's wallet
-	wallet, err := s.walletLedgerClient.GetWalletByUserIDAndCurrency(ctx, customerID, currency)
-	if err != nil {
-		// If wallet not found, try to create one
-		createWalletReq := dto.CreateWalletRequest{
-			UserID:   customerID,
-			Currency: currency,
+	// We only attempt wallet operations if a valid customer ID is provided.
+	if customerID != 0 {
+		// First, try to get the customer's wallet
+		wallet, err := s.walletLedgerClient.GetWalletByUserIDAndCurrency(ctx, customerID, currency)
+		if err != nil {
+			// If wallet not found, try to create one
+			createWalletReq := dto.CreateWalletRequest{
+				UserID:   customerID,
+				Currency: currency,
+			}
+			newWallet, createErr := s.walletLedgerClient.CreateWallet(ctx, createWalletReq)
+			if createErr != nil {
+				// Wallet ledger service unavailable - log but don't fail the transaction
+				fmt.Printf("Warning: failed to get or create wallet for customer %d: %v\n", customerID, createErr)
+				// Transaction was already created successfully, return success
+				return dto.CheckoutPayResponse{
+					TransactionReference: txResp.Reference,
+					Status:               "paid",
+				}, nil
+			}
+			wallet = newWallet
 		}
-		newWallet, createErr := s.walletLedgerClient.CreateWallet(ctx, createWalletReq)
-		if createErr != nil {
-			// Wallet ledger service unavailable - log but don't fail the transaction
-			fmt.Printf("Warning: failed to get or create wallet for customer %d: %v\n", customerID, createErr)
-			// Transaction was already created successfully, return success
-			return dto.CheckoutPayResponse{
-				TransactionReference: txResp.Reference,
-				Status:               "paid",
-			}, nil
+
+		// Credit the wallet
+		netCredit := amount - feeAmount
+		if netCredit < 0 {
+			netCredit = 0
 		}
-		wallet = newWallet
-	}
 
-	// Credit the wallet
-	netCredit := amount - feeAmount
-	if netCredit < 0 {
-		netCredit = 0
-	}
+		updateBalanceReq := dto.UpdateBalanceRequest{
+			Amount:      netCredit,
+			Reference:   txResp.Reference, // Link to the transaction (string)
+			Description: fmt.Sprintf("Credit for transaction %s (fee: %d)", txResp.Reference, feeAmount),
+			Type:        "credit",
+		}
 
-	updateBalanceReq := dto.UpdateBalanceRequest{
-		Amount:      netCredit,
-		Reference:   txResp.Reference, // Link to the transaction (string)
-		Description: fmt.Sprintf("Credit for transaction %s (fee: %d)", txResp.Reference, feeAmount),
-		Type:        "credit",
-	}
-
-	_, err = s.walletLedgerClient.UpdateWalletBalance(ctx, wallet.ID, updateBalanceReq)
-	if err != nil {
-		// Log the error but don't fail the transaction
-		fmt.Printf("Warning: failed to update wallet balance: %v\n", err)
+		_, err = s.walletLedgerClient.UpdateWalletBalance(ctx, wallet.ID, updateBalanceReq)
+		if err != nil {
+			// Log the error but don't fail the transaction
+			fmt.Printf("Warning: failed to update wallet balance: %v\n", err)
+		}
+	} else {
+		fmt.Printf("Info: Skipping wallet operations for customer 0 as no valid customer ID was provided.\n")
 	}
 
 	return dto.CheckoutPayResponse{
