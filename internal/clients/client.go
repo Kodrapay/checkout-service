@@ -64,9 +64,9 @@ func (c *HTTPTransactionClient) CreateTransaction(ctx context.Context, req dto.T
 
 // WalletLedgerClient defines the interface for interacting with the Wallet-Ledger Service
 type WalletLedgerClient interface {
-	GetWalletByUserIDAndCurrency(ctx context.Context, userID, currency string) (*dto.WalletResponse, error)
+	GetWalletByUserIDAndCurrency(ctx context.Context, userID int, currency string) (*dto.WalletResponse, error)
 	CreateWallet(ctx context.Context, req dto.CreateWalletRequest) (*dto.WalletResponse, error)
-	UpdateWalletBalance(ctx context.Context, walletID string, req dto.UpdateBalanceRequest) (*dto.WalletResponse, error)
+	UpdateWalletBalance(ctx context.Context, walletID int, req dto.UpdateBalanceRequest) (*dto.WalletResponse, error)
 }
 
 // FeeClient defines interface for fee-service
@@ -90,8 +90,8 @@ func NewHTTPWalletLedgerClient(baseURL string) *HTTPWalletLedgerClient {
 	}
 }
 
-func (c *HTTPWalletLedgerClient) GetWalletByUserIDAndCurrency(ctx context.Context, userID, currency string) (*dto.WalletResponse, error) {
-	url := fmt.Sprintf("%s/wallets?user_id=%s&currency=%s", c.baseURL, userID, currency)
+func (c *HTTPWalletLedgerClient) GetWalletByUserIDAndCurrency(ctx context.Context, userID int, currency string) (*dto.WalletResponse, error) {
+	url := fmt.Sprintf("%s/wallets?user_id=%d&currency=%s", c.baseURL, userID, currency)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)
@@ -145,13 +145,13 @@ func (c *HTTPWalletLedgerClient) CreateWallet(ctx context.Context, req dto.Creat
 	return &resp, nil
 }
 
-func (c *HTTPWalletLedgerClient) UpdateWalletBalance(ctx context.Context, walletID string, req dto.UpdateBalanceRequest) (*dto.WalletResponse, error) {
+func (c *HTTPWalletLedgerClient) UpdateWalletBalance(ctx context.Context, walletID int, req dto.UpdateBalanceRequest) (*dto.WalletResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal update balance request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/wallets/%s/update-balance", c.baseURL, walletID)
+	url := fmt.Sprintf("%s/wallets/%d/update-balance", c.baseURL, walletID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)

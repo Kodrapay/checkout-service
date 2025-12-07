@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
-
-	"github.com/google/uuid"
+	"strconv"
 
 	"github.com/kodra-pay/checkout-service/internal/clients"
 	"github.com/kodra-pay/checkout-service/internal/dto"
@@ -20,7 +19,7 @@ type CheckoutService struct {
 }
 
 type PaymentLinkRepository interface {
-	GetByID(ctx context.Context, id string) (*models.PaymentLink, error)
+	GetByID(ctx context.Context, id int) (*models.PaymentLink, error)
 }
 
 func NewCheckoutService(txClient clients.TransactionClient, wlClient clients.WalletLedgerClient, feeClient clients.FeeClient, plRepo PaymentLinkRepository) *CheckoutService {
@@ -34,16 +33,18 @@ func NewCheckoutService(txClient clients.TransactionClient, wlClient clients.Wal
 
 func (s *CheckoutService) CreateSession(_ context.Context, req dto.CheckoutSessionRequest) dto.CheckoutSessionResponse {
 	// In a real scenario, this would store session details and return a unique ID.
-	// For now, it's a placeholder.
+	// For now, it's a placeholder. Since we are using int IDs, we can use a simple counter
+	// or, more realistically, this ID would come from a database insertion.
+	// For this placeholder, we'll return a static ID or 0.
 	return dto.CheckoutSessionResponse{
-		ID:       "chk_" + uuid.NewString(),
+		ID:       1, // Placeholder for an auto-generated int ID
 		Status:   "pending",
 		Amount:   req.Amount,
 		Currency: req.Currency,
 	}
 }
 
-func (s *CheckoutService) GetSession(_ context.Context, id string) dto.CheckoutSessionResponse {
+func (s *CheckoutService) GetSession(_ context.Context, id int) dto.CheckoutSessionResponse {
 	// In a real scenario, this would retrieve session details by ID.
 	// For now, it's a placeholder.
 	return dto.CheckoutSessionResponse{
@@ -62,7 +63,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	description := req.Description
 
 	// If payment link ID is provided, fetch payment link details
-	if req.PaymentLinkID != "" {
+	if req.PaymentLinkID != 0 {
 		paymentLink, err := s.paymentLinkRepo.GetByID(ctx, req.PaymentLinkID)
 		if err != nil {
 			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("failed to get payment link: %w", err)
@@ -80,13 +81,14 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	}
 
 	// Validate required fields
-	if merchantID == "" || amount <= 0 || currency == "" {
+	if merchantID == 0 || amount <= 0 || currency == "" {
 		return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("merchant_id, amount, and currency are required")
 	}
 
 	customerID := req.CustomerID
-	if customerID == "" {
-		customerID = req.CustomerEmail
+	if customerID == 0 {
+		// If customerID is 0, we can potentially use customerEmail for wallet lookup
+		// However, for consistency with int IDs, we'll assume 0 means no specific ID.
 	}
 	if description == "" {
 		description = "Payment Link Transaction"
@@ -108,6 +110,15 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	}
 
 	// 2. Create Transaction in Transaction Service (gross amount)
+	var referenceInt int
+	if req.Reference != "" {
+		if parsed, err := strconv.Atoi(req.Reference); err == nil {
+			referenceInt = parsed
+		} else {
+			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("invalid reference: must be numeric")
+		}
+	}
+
 	transactionReq := dto.TransactionCreateRequest{
 		MerchantID:    merchantID,
 		CustomerEmail: req.CustomerEmail,
@@ -118,7 +129,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		PaymentMethod: req.PaymentMethod,
 		Description:   description,
 		Status:        "successful", // Assuming immediate success for now
-		Reference:     req.Reference,
+		Reference:     referenceInt,
 	}
 
 	txResp, err := s.transactionClient.CreateTransaction(ctx, transactionReq)
@@ -139,7 +150,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		newWallet, createErr := s.walletLedgerClient.CreateWallet(ctx, createWalletReq)
 		if createErr != nil {
 			// Wallet ledger service unavailable - log but don't fail the transaction
-			fmt.Printf("Warning: failed to get or create wallet for customer %s: %v\n", customerID, createErr)
+			fmt.Printf("Warning: failed to get or create wallet for customer %d: %v\n", customerID, createErr)
 			// Transaction was already created successfully, return success
 			return dto.CheckoutPayResponse{
 				TransactionReference: txResp.Reference,
@@ -157,8 +168,8 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 
 	updateBalanceReq := dto.UpdateBalanceRequest{
 		Amount:      netCredit,
-		Reference:   txResp.Reference, // Link to the transaction
-		Description: fmt.Sprintf("Credit for transaction %s (fee: %d)", txResp.Reference, feeAmount),
+		Reference:   txResp.Reference, // Link to the transaction (int)
+		Description: fmt.Sprintf("Credit for transaction %d (fee: %d)", txResp.Reference, feeAmount),
 		Type:        "credit",
 	}
 

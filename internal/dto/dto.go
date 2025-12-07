@@ -3,48 +3,48 @@ package dto
 import "time"
 
 type CheckoutSessionRequest struct {
-	MerchantID    string `json:"merchant_id"`
-	Amount        int64  `json:"amount"`
+	MerchantID    int    `json:"merchant_id,omitempty"`
+	Amount        int64  `json:"amount,omitempty"`
 	Currency      string `json:"currency"`
 	Description   string `json:"description"`
 	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerID    string `json:"customer_id,omitempty"` // Added for clarity
+	CustomerID    int    `json:"customer_id,omitempty"`
 }
 
 type CheckoutSessionResponse struct {
-	ID       string `json:"id"`
+	ID       int    `json:"id"`
 	Status   string `json:"status"`
 	Amount   int64  `json:"amount"`
 	Currency string `json:"currency"`
 }
 
 type CheckoutPayRequest struct {
-	SessionID     string `json:"session_id,omitempty"`
-	PaymentLinkID string `json:"payment_link_id,omitempty"`
+	SessionID     int    `json:"session_id,omitempty"`
+	PaymentLinkID int    `json:"payment_link_id,omitempty"`
 	PaymentMethod string `json:"payment_method,omitempty"`
 	TokenID       string `json:"token_id,omitempty"`
-	MerchantID    string `json:"merchant_id,omitempty"`
+	MerchantID    int    `json:"merchant_id,omitempty"`
 	Amount        int64  `json:"amount,omitempty"`
 	Currency      string `json:"currency,omitempty"`
 	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerID    string `json:"customer_id,omitempty"`
+	CustomerID    int    `json:"customer_id,omitempty"`
 	CustomerName  string `json:"customer_name,omitempty"`
 	Description   string `json:"description,omitempty"`
 	Reference     string `json:"reference,omitempty"`
 }
 
 type CheckoutPayResponse struct {
-	TransactionReference string `json:"transaction_reference,omitempty"`
+	TransactionReference int    `json:"transaction_reference,omitempty"`
 	Status               string `json:"status"`
 }
 
 // TransactionCreateRequest DTO for creating a new transaction in transaction-service
 type TransactionCreateRequest struct {
-	Reference     string `json:"reference,omitempty"`
-	MerchantID    string `json:"merchant_id"`
+	Reference     int    `json:"reference,omitempty"`
+	MerchantID    int    `json:"merchant_id"`
 	CustomerEmail string `json:"customer_email,omitempty"`
 	CustomerName  string `json:"customer_name,omitempty"`
-	CustomerID    string `json:"customer_id"` // Explicitly added
+	CustomerID    int    `json:"customer_id"`
 	Amount        int64  `json:"amount"`
 	Currency      string `json:"currency"`
 	PaymentMethod string `json:"payment_method,omitempty"`
@@ -54,9 +54,9 @@ type TransactionCreateRequest struct {
 
 // TransactionResponse DTO for transaction-service response
 type TransactionResponse struct {
-	ID            string    `json:"id"`
-	Reference     string    `json:"reference"`
-	MerchantID    string    `json:"merchant_id"`
+	ID            int       `json:"id"`
+	Reference     int       `json:"reference"`
+	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email"`
 	CustomerName  string    `json:"customer_name,omitempty"`
 	Amount        int64     `json:"amount"`
@@ -68,22 +68,22 @@ type TransactionResponse struct {
 
 // CreateWalletRequest DTO for creating a new wallet in wallet-ledger-service
 type CreateWalletRequest struct {
-	UserID   string `json:"user_id"`
+	UserID   int    `json:"user_id"`
 	Currency string `json:"currency"`
 }
 
 // UpdateBalanceRequest DTO for updating a wallet's balance in wallet-ledger-service
 type UpdateBalanceRequest struct {
 	Amount      int64  `json:"amount"`
-	Reference   string `json:"reference"`
+	Reference   int    `json:"reference"`
 	Description string `json:"description"`
 	Type        string `json:"type"` // "credit" or "debit"
 }
 
 // WalletResponse DTO for returning wallet information from wallet-ledger-service
 type WalletResponse struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
 	Currency  string    `json:"currency"`
 	Balance   int64     `json:"balance"`
 	CreatedAt time.Time `json:"created_at"`

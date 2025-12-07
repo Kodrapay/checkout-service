@@ -40,7 +40,7 @@ func (r *PaymentLinkRepository) Create(ctx context.Context, pl *models.PaymentLi
 	).Scan(&pl.ID, &pl.CreatedAt, &pl.UpdatedAt)
 }
 
-func (r *PaymentLinkRepository) GetByID(ctx context.Context, id string) (*models.PaymentLink, error) {
+func (r *PaymentLinkRepository) GetByID(ctx context.Context, id int) (*models.PaymentLink, error) {
 	query := `
 		SELECT id, merchant_id, mode, amount, currency, description, status, expires_at, created_at, updated_at
 		FROM payment_links
@@ -57,7 +57,7 @@ func (r *PaymentLinkRepository) GetByID(ctx context.Context, id string) (*models
 	return &pl, nil
 }
 
-func (r *PaymentLinkRepository) ListByMerchant(ctx context.Context, merchantID string, limit int) ([]*models.PaymentLink, error) {
+func (r *PaymentLinkRepository) ListByMerchant(ctx context.Context, merchantID int, limit int) ([]*models.PaymentLink, error) {
 	query := `
 		SELECT id, merchant_id, mode, amount, currency, description, status, expires_at, created_at, updated_at
 		FROM payment_links

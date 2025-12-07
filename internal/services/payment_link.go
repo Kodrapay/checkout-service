@@ -40,7 +40,7 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 	}
 }
 
-func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID string) dto.PaymentLinkListResponse {
+func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID int) dto.PaymentLinkListResponse { // merchantID changed to int
 	links, _ := s.repo.ListByMerchant(ctx, merchantID, 50)
 	resp := dto.PaymentLinkListResponse{}
 	for _, pl := range links {

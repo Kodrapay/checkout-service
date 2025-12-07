@@ -24,7 +24,10 @@ func (h *CheckoutHandler) CreateSession(c *fiber.Ctx) error {
 }
 
 func (h *CheckoutHandler) GetSession(c *fiber.Ctx) error {
-	id := c.Params("id")
+	id, err := c.ParamsInt("id") // Use c.ParamsInt
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid session ID")
+	}
 	return c.JSON(h.svc.GetSession(c.Context(), id))
 }
 
@@ -57,6 +60,10 @@ func (h *PaymentLinkHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *PaymentLinkHandler) List(c *fiber.Ctx) error {
-	merchantID := c.Query("merchant_id")
+	merchantID := c.QueryInt("merchant_id", 0) // Use c.QueryInt for query parameters
+	// If merchantID is mandatory, you might add an error check here:
+	// if merchantID == 0 {
+	//    return fiber.NewError(fiber.StatusBadRequest, "merchant_id query parameter is required")
+	// }
 	return c.JSON(h.svc.ListByMerchant(c.Context(), merchantID))
 }
