@@ -62,7 +62,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	// For this exercise, we assume payment is successful.
 
 	merchantID := req.MerchantID
-	amount := req.Amount
+	amount := req.Amount // currency units (e.g., NGN)
 	currency := req.Currency
 	description := req.Description
 	customerIDStr := strconv.Itoa(req.CustomerID) // Convert CustomerID to string for fraud service
@@ -118,11 +118,10 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		}
 	}
 
-
 	// === FRAUD CHECK ===
 	fraudReq := dto.FraudCheckRequest{
 		TransactionReference: transactionReference, // Use the generated/prefixed reference
-		Amount:               float64(amount) / 100, // Convert back to float for fraud service, assuming cents
+		Amount:               amount,               // already in currency units
 		Currency:             currency,
 		CustomerID:           customerIDStr,
 		MerchantID:           strconv.Itoa(merchantID),
@@ -143,7 +142,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	// === END FRAUD CHECK ===
 
 	// 1. Quote fees (best-effort; fall back to zero on error)
-	var feeAmount int64
+	var feeAmount float64
 	if s.feeClient != nil {
 		quote, err := s.feeClient.Quote(ctx, dto.FeeQuoteRequest{
 			Amount:   float64(amount),
@@ -153,7 +152,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		if err != nil {
 			fmt.Printf("Warning: fee quote failed: %v\n", err)
 		} else {
-			feeAmount = int64(math.Round(quote.TotalFee))
+			feeAmount = quote.TotalFee
 		}
 	}
 
@@ -167,7 +166,7 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		Currency:      currency,
 		PaymentMethod: req.PaymentMethod,
 		Description:   description,
-		Status:        "successful",  // Assuming immediate success for now
+		Status:        "successful",         // Assuming immediate success for now
 		Reference:     transactionReference, // Use the generated/prefixed reference
 	}
 
@@ -212,10 +211,12 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 			netCredit = 0
 		}
 
+		netCreditKobo := int64(math.Round(netCredit * 100))
+
 		updateBalanceReq := dto.UpdateBalanceRequest{
-			Amount:      netCredit,
+			Amount:      netCreditKobo,
 			Reference:   txResp.Reference, // Link to the transaction (string)
-			Description: fmt.Sprintf("Credit for transaction %s (fee: %d)", txResp.Reference, feeAmount),
+			Description: fmt.Sprintf("Credit for transaction %s (fee: %.2f)", txResp.Reference, feeAmount),
 			Type:        "credit",
 		}
 

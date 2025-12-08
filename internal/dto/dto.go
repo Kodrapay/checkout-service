@@ -3,54 +3,54 @@ package dto
 import "time"
 
 type CheckoutSessionRequest struct {
-	MerchantID    int    `json:"merchant_id,omitempty"`
-	Amount        int64  `json:"amount,omitempty"`
-	Currency      string `json:"currency"`
-	Description   string `json:"description"`
-	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerID    int    `json:"customer_id,omitempty"`
+	MerchantID    int     `json:"merchant_id,omitempty"`
+	Amount        float64 `json:"amount,omitempty"` // currency units (e.g., NGN)
+	Currency      string  `json:"currency"`
+	Description   string  `json:"description"`
+	CustomerEmail string  `json:"customer_email,omitempty"`
+	CustomerID    int     `json:"customer_id,omitempty"`
 }
 
 type CheckoutSessionResponse struct {
-	ID       int    `json:"id"`
-	Status   string `json:"status"`
-	Amount   int64  `json:"amount"`
-	Currency string `json:"currency"`
+	ID       int     `json:"id"`
+	Status   string  `json:"status"`
+	Amount   float64 `json:"amount"` // currency units (e.g., NGN)
+	Currency string  `json:"currency"`
 }
 
 type CheckoutPayRequest struct {
-	SessionID     int    `json:"session_id,omitempty"`
-	PaymentLinkID int    `json:"payment_link_id,omitempty"`
-	PaymentMethod string `json:"payment_method,omitempty"`
-	TokenID       string `json:"token_id,omitempty"`
-	MerchantID    int    `json:"merchant_id,omitempty"`
-	Amount        int64  `json:"amount,omitempty"`
-	Currency      string `json:"currency,omitempty"`
-	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerID    int    `json:"customer_id,omitempty"`
-	CustomerName  string `json:"customer_name,omitempty"`
-	Description   string `json:"description,omitempty"`
-	Reference     string `json:"reference,omitempty"`
-	Origin        string `json:"origin,omitempty"` // Added for client IP
+	SessionID     int     `json:"session_id,omitempty"`
+	PaymentLinkID int     `json:"payment_link_id,omitempty"`
+	PaymentMethod string  `json:"payment_method,omitempty"`
+	TokenID       string  `json:"token_id,omitempty"`
+	MerchantID    int     `json:"merchant_id,omitempty"`
+	Amount        float64 `json:"amount,omitempty"` // currency units (e.g., NGN)
+	Currency      string  `json:"currency,omitempty"`
+	CustomerEmail string  `json:"customer_email,omitempty"`
+	CustomerID    int     `json:"customer_id,omitempty"`
+	CustomerName  string  `json:"customer_name,omitempty"`
+	Description   string  `json:"description,omitempty"`
+	Reference     string  `json:"reference,omitempty"`
+	Origin        string  `json:"origin,omitempty"` // Added for client IP
 }
 
 type CheckoutPayResponse struct {
-	TransactionReference string    `json:"transaction_reference,omitempty"`
+	TransactionReference string `json:"transaction_reference,omitempty"`
 	Status               string `json:"status"`
 }
 
 // TransactionCreateRequest DTO for creating a new transaction in transaction-service
 type TransactionCreateRequest struct {
-	Reference     string    `json:"reference,omitempty"`
-	MerchantID    int    `json:"merchant_id"`
-	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerName  string `json:"customer_name,omitempty"`
-	CustomerID    int    `json:"customer_id"`
-	Amount        int64  `json:"amount"`
-	Currency      string `json:"currency"`
-	PaymentMethod string `json:"payment_method,omitempty"`
-	Description   string `json:"description,omitempty"`
-	Status        string `json:"status,omitempty"` // status should be handled by transaction service
+	Reference     string  `json:"reference,omitempty"`
+	MerchantID    int     `json:"merchant_id"`
+	CustomerEmail string  `json:"customer_email,omitempty"`
+	CustomerName  string  `json:"customer_name,omitempty"`
+	CustomerID    int     `json:"customer_id"`
+	Amount        float64 `json:"amount"` // currency units (e.g., NGN)
+	Currency      string  `json:"currency"`
+	PaymentMethod string  `json:"payment_method,omitempty"`
+	Description   string  `json:"description,omitempty"`
+	Status        string  `json:"status,omitempty"` // status should be handled by transaction service
 }
 
 // TransactionResponse DTO for transaction-service response
@@ -60,7 +60,7 @@ type TransactionResponse struct {
 	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email"`
 	CustomerName  string    `json:"customer_name,omitempty"`
-	Amount        int64     `json:"amount"`
+	Amount        float64   `json:"amount"` // currency units (e.g., NGN)
 	Currency      string    `json:"currency"`
 	Status        string    `json:"status"`
 	Description   string    `json:"description,omitempty"`
