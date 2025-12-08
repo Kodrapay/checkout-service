@@ -5,8 +5,8 @@ import "time"
 type PaymentLink struct {
 	ID          int        `json:"id"`
 	MerchantID  int        `json:"merchant_id"`
-	Mode        string     `json:"mode"` // fixed or open
-	Amount      *int64     `json:"amount,omitempty"`
+	Mode        string     `json:"mode"`             // fixed or open
+	Amount      *int64     `json:"amount,omitempty"` // stored in kobo
 	Currency    string     `json:"currency"`
 	Description string     `json:"description"`
 	Status      string     `json:"status"`

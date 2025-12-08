@@ -81,11 +81,11 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		// For open links, honor the client-provided amount when present; fall back to link amount only if none was supplied.
 		if paymentLink.Mode == "fixed" {
 			if paymentLink.Amount != nil {
-				amount = *paymentLink.Amount
+				amount = float64(*paymentLink.Amount) / 100
 			}
 		} else {
 			if amount == 0 && paymentLink.Amount != nil {
-				amount = *paymentLink.Amount
+				amount = float64(*paymentLink.Amount) / 100
 			}
 		}
 

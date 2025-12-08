@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/kodra-pay/checkout-service/internal/dto"
@@ -19,10 +20,16 @@ func NewPaymentLinkService(repo *repositories.PaymentLinkRepository) *PaymentLin
 }
 
 func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCreateRequest) (dto.PaymentLinkResponse, error) {
+	var amountKobo *int64
+	if req.Amount != nil {
+		val := int64(math.Round(*req.Amount * 100))
+		amountKobo = &val
+	}
+
 	pl := &models.PaymentLink{
 		MerchantID:  req.MerchantID,
 		Mode:        req.Mode,
-		Amount:      req.Amount,
+		Amount:      amountKobo,
 		Currency:    req.Currency,
 		Description: req.Description,
 		Status:      "active",
@@ -35,7 +42,7 @@ func (s *PaymentLinkService) Create(ctx context.Context, req dto.PaymentLinkCrea
 		ID:          pl.ID,
 		MerchantID:  pl.MerchantID,
 		Mode:        pl.Mode,
-		Amount:      pl.Amount,
+		Amount:      toCurrency(pl.Amount),
 		Currency:    pl.Currency,
 		Description: pl.Description,
 		Status:      pl.Status,
@@ -51,7 +58,7 @@ func (s *PaymentLinkService) ListByMerchant(ctx context.Context, merchantID int)
 			ID:          pl.ID,
 			MerchantID:  pl.MerchantID,
 			Mode:        pl.Mode,
-			Amount:      pl.Amount,
+			Amount:      toCurrency(pl.Amount),
 			Currency:    pl.Currency,
 			Description: pl.Description,
 			Status:      pl.Status,
@@ -70,11 +77,19 @@ func (s *PaymentLinkService) Get(ctx context.Context, id int) (*dto.PaymentLinkR
 		ID:          pl.ID,
 		MerchantID:  pl.MerchantID,
 		Mode:        pl.Mode,
-		Amount:      pl.Amount,
+		Amount:      toCurrency(pl.Amount),
 		Currency:    pl.Currency,
 		Description: pl.Description,
 		Status:      pl.Status,
 		CreatedAt:   pl.CreatedAt.Format(time.RFC3339),
 	}
 	return resp, nil
+}
+
+func toCurrency(amountKobo *int64) *float64 {
+	if amountKobo == nil {
+		return nil
+	}
+	val := float64(*amountKobo) / 100
+	return &val
 }
