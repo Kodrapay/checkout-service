@@ -46,13 +46,24 @@ func (r *PaymentLinkRepository) GetByID(ctx context.Context, id int) (*models.Pa
 		FROM payment_links
 		WHERE id = $1
 	`
-	var pl models.PaymentLink
+	var (
+		pl      models.PaymentLink
+		amount  sql.NullInt64
+		expires sql.NullTime
+	)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&pl.ID, &pl.MerchantID, &pl.Mode, &pl.Amount, &pl.Currency,
-		&pl.Description, &pl.Reference, &pl.Status, &pl.Signature, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
+		&pl.ID, &pl.MerchantID, &pl.Mode, &amount, &pl.Currency,
+		&pl.Description, &pl.Reference, &pl.Status, &pl.Signature, &expires, &pl.CreatedAt, &pl.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if amount.Valid {
+		val := amount.Int64
+		pl.Amount = &val
+	}
+	if expires.Valid {
+		pl.ExpiresAt = &expires.Time
 	}
 	return &pl, nil
 }
@@ -73,12 +84,23 @@ func (r *PaymentLinkRepository) ListByMerchant(ctx context.Context, merchantID i
 
 	var links []*models.PaymentLink
 	for rows.Next() {
-		var pl models.PaymentLink
+		var (
+			pl      models.PaymentLink
+			amount  sql.NullInt64
+			expires sql.NullTime
+		)
 		if err := rows.Scan(
-			&pl.ID, &pl.MerchantID, &pl.Mode, &pl.Amount, &pl.Currency,
-			&pl.Description, &pl.Status, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
+			&pl.ID, &pl.MerchantID, &pl.Mode, &amount, &pl.Currency,
+			&pl.Description, &pl.Status, &expires, &pl.CreatedAt, &pl.UpdatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if amount.Valid {
+			val := amount.Int64
+			pl.Amount = &val
+		}
+		if expires.Valid {
+			pl.ExpiresAt = &expires.Time
 		}
 		links = append(links, &pl)
 	}
