@@ -2,8 +2,12 @@ package services
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 
 	"github.com/google/uuid" // Import uuid
@@ -72,6 +76,11 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		paymentLink, err := s.paymentLinkRepo.GetByID(ctx, req.PaymentLinkID)
 		if err != nil {
 			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("failed to get payment link: %w", err)
+		}
+
+		// Verify payment link signature to detect tampering
+		if !verifyPaymentLinkSignature(paymentLink) {
+			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("payment link signature verification failed - possible tampering detected")
 		}
 
 		// Use payment link values where appropriate
@@ -233,4 +242,40 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 		TransactionReference: txResp.Reference,
 		Status:               "paid",
 	}, nil
+}
+
+// verifyPaymentLinkSignature verifies that a payment link's parameters haven't been tampered with
+func verifyPaymentLinkSignature(link *models.PaymentLink) bool {
+	if link.Signature == "" {
+		// Old links without signature - allow them but log warning
+		fmt.Printf("Warning: Payment link %d has no signature\n", link.ID)
+		return true
+	}
+
+	secret := os.Getenv("PAYMENT_LINK_SECRET")
+	if secret == "" {
+		secret = "kodrapay-default-secret-change-in-production"
+	}
+
+	// Create canonical string from link parameters (same as generation)
+	amountStr := "null"
+	if link.Amount != nil {
+		amountStr = strconv.FormatInt(*link.Amount, 10)
+	}
+
+	data := fmt.Sprintf("%d|%s|%s|%s|%s",
+		link.MerchantID,
+		link.Mode,
+		amountStr,
+		link.Currency,
+		link.Description,
+	)
+
+	// Generate expected HMAC-SHA256 signature
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(data))
+	expectedSignature := hex.EncodeToString(h.Sum(nil))
+
+	// Constant-time comparison to prevent timing attacks
+	return hmac.Equal([]byte(link.Signature), []byte(expectedSignature))
 }

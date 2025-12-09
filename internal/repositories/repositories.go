@@ -42,14 +42,14 @@ func (r *PaymentLinkRepository) Create(ctx context.Context, pl *models.PaymentLi
 
 func (r *PaymentLinkRepository) GetByID(ctx context.Context, id int) (*models.PaymentLink, error) {
 	query := `
-		SELECT id, merchant_id, mode, amount, currency, description, status, expires_at, created_at, updated_at
+		SELECT id, merchant_id, mode, amount, currency, description, reference, status, signature, expires_at, created_at, updated_at
 		FROM payment_links
 		WHERE id = $1
 	`
 	var pl models.PaymentLink
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&pl.ID, &pl.MerchantID, &pl.Mode, &pl.Amount, &pl.Currency,
-		&pl.Description, &pl.Status, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
+		&pl.Description, &pl.Reference, &pl.Status, &pl.Signature, &pl.ExpiresAt, &pl.CreatedAt, &pl.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
