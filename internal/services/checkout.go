@@ -66,10 +66,10 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 	// For this exercise, we assume payment is successful.
 
 	merchantID := req.MerchantID
-	amount := req.Amount // currency units (e.g., NGN)
+	var finalAmount float64 // Use a new variable for the amount that will actually be used for the transaction
 	currency := req.Currency
 	description := req.Description
-	customerIDStr := strconv.Itoa(req.CustomerID) // Convert CustomerID to string for fraud service
+	customerIDStr := strconv.Itoa(req.CustomerID)
 
 	// If payment link ID is provided, fetch payment link details
 	if req.PaymentLinkID != 0 {
@@ -83,30 +83,48 @@ func (s *CheckoutService) Pay(ctx context.Context, req dto.CheckoutPayRequest) (
 			return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("payment link signature verification failed - possible tampering detected")
 		}
 
-		// Use payment link values where appropriate
+		// Use payment link values for merchant and currency
 		merchantID = paymentLink.MerchantID
 		currency = paymentLink.Currency
 
-		// For open links, honor the client-provided amount when present; fall back to link amount only if none was supplied.
+		// CRITICAL: Determine final amount based on payment link mode
 		if paymentLink.Mode == "fixed" {
-			if paymentLink.Amount != nil {
-				amount = float64(*paymentLink.Amount) / 100
+			if paymentLink.Amount == nil {
+				// A fixed link MUST have an amount defined in the database. This indicates misconfiguration.
+				return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("fixed payment link %d has no amount defined in database", paymentLink.ID)
 			}
-		} else {
-			if amount == 0 && paymentLink.Amount != nil {
-				amount = float64(*paymentLink.Amount) / 100
+			finalAmount = float64(*paymentLink.Amount) / 100 // FIXED: Unconditionally use DB amount for fixed links
+		} else { // paymentLink.Mode == "open"
+			// For open links, honor client-provided amount if > 0, otherwise use link's default amount
+			if req.Amount > 0 {
+				finalAmount = req.Amount // Client can specify amount for open links
+			} else if paymentLink.Amount != nil {
+				finalAmount = float64(*paymentLink.Amount) / 100 // Fallback to link's default amount
+			} else {
+				// For open links without client amount and no default amount, client MUST provide it.
+				// If not provided by client and not in link, it's an error.
+				if req.Amount <= 0 {
+					return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("open payment link requires a client-provided amount greater than 0")
+				}
+				finalAmount = req.Amount // Fallback if no link amount.
 			}
 		}
 
 		if paymentLink.Description != "" {
 			description = paymentLink.Description
 		}
+	} else {
+		// No PaymentLinkID, proceed with client-provided details
+		finalAmount = req.Amount
 	}
 
-	// Validate required fields
-	if merchantID == 0 || amount <= 0 || currency == "" {
+	// Validate required fields (using finalAmount)
+	if merchantID == 0 || finalAmount <= 0 || currency == "" {
 		return dto.CheckoutPayResponse{Status: "failed"}, fmt.Errorf("merchant_id, amount, and currency are required")
 	}
+
+	// Now use finalAmount for all subsequent logic (fraud check, fee calculation, transaction creation)
+	amount = finalAmount // Assign to 'amount' variable for consistency with existing code downstream
 
 	customerID := req.CustomerID
 	if customerID == 0 {
